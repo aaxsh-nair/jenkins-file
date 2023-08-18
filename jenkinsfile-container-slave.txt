@@ -1,0 +1,98 @@
+  pipeline {
+    agent any // Run on any available node
+    environment {
+      slave_namespace = "jenkins_slave_ns"
+    }
+
+    stages {
+
+      //This Stage will Identify the busy and free nodes
+      stage('Identify the node') {
+        steps {
+          script {
+            def jobNode
+            def nodeList = nodesByLabel label: 'vm_slave', offline: false
+            for (label in nodeList) {
+              for (Node node in Hudson.instance.nodes) {
+                def nodeName = node.getNodeName()
+                if (nodeName == "${label}" && env.jobNode == null) {
+                  def busy_count = node.toComputer().countBusy()
+                  if (busy_count == 0) {
+                    echo "Node ${nodeName} is free, executing hello world"
+                    env.jobNode = "${nodeName}"
+                    break
+                  }
+                }
+              }
+            }
+
+            if (env.jobNode == null) {
+              echo "All nodes are busy, creating a dynamic container node"
+
+              env.jobNode = "container"
+              echo "Creating new node"
+            }
+          }
+        }
+      }
+
+      // This Stage Creates a new Pod Only if all nodes are busy
+      stage('Create new slave pod for job') {
+        when {
+          expression {
+            env.jobNode == "container"
+          }
+        }
+
+        steps {
+          podTemplate(yaml: '''
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      namespace: jenkins
+    spec:
+      containers:
+      - name: maven
+        image: maven:3.8.1-jdk-8
+        command:
+        - sleep
+        args:
+        - 99d
+''')
+          
+          {
+            node(POD_LABEL) {
+              
+              //Run your build here
+              sh "echo Hello World"
+              sh "sleep 10"
+              sh "hostname"
+              sh "mvn -v"
+            }
+          }
+        }
+      }
+
+      // In this stage you can run you build or the jobs
+      stage('sample') {
+          
+        when {
+          expression {
+            not(env.jobNode == "container")
+          }
+        }
+          
+        agent {
+          node "${jobNode}"
+        }
+        
+        steps {
+          echo "Running Job on ${jobNode}"
+          sh "hostname"
+          //Run your build here
+          sh 'sleep 10'
+        }
+      }
+
+    }
+  }
