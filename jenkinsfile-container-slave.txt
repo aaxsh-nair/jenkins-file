@@ -46,19 +46,9 @@
 
         steps {
           podTemplate(yaml: '''
-    apiVersion: v1
-    kind: Pod
-    metadata:
-      namespace: jenkins
-    spec:
-      containers:
-      - name: maven
-        image: maven:3.8.1-jdk-8
-        command:
-        - sleep
-        args:
-        - 99d
-''')
+            metadata:
+              namespace: jenkins
+            ''')
           
           {
             node(POD_LABEL) {
@@ -67,7 +57,6 @@
               sh "echo Hello World"
               sh "sleep 10"
               sh "hostname"
-              sh "mvn -v"
             }
           }
         }
