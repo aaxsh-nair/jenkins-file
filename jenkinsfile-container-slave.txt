@@ -11,7 +11,7 @@
         steps {
           script {
             def jobNode
-            def nodeList = nodesByLabel label: 'wf_test', offline: false
+            def nodeList = nodesByLabel label: '${env.vm_label}', offline: false
             for (label in nodeList) {
               for (Node node in Hudson.instance.nodes) {
                 def nodeName = node.getNodeName()
@@ -46,7 +46,7 @@
         }
 
         steps {
-          podTemplate(inheritFrom: 'container_slave')
+          podTemplate(inheritFrom: 'jenkins_slave')
 
             {
               node(POD_LABEL) {
