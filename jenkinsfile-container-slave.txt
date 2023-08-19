@@ -1,7 +1,7 @@
   pipeline {
-    agent any // Run on any available node
+    agent any
     environment {
-      slave_namespace = "jenkins_slave_ns"
+      vm_label = "wf_test"
     }
 
     stages {
@@ -11,7 +11,7 @@
         steps {
           script {
             def jobNode
-            def nodeList = nodesByLabel label: 'vm_slave', offline: false
+            def nodeList = nodesByLabel label: 'wf_test', offline: false
             for (label in nodeList) {
               for (Node node in Hudson.instance.nodes) {
                 def nodeName = node.getNodeName()
@@ -38,6 +38,7 @@
 
       // This Stage Creates a new Pod Only if all nodes are busy
       stage('Create new slave pod for job') {
+
         when {
           expression {
             env.jobNode == "container"
@@ -45,43 +46,41 @@
         }
 
         steps {
-          podTemplate(yaml: '''
-            metadata:
-              namespace: jenkins
-            ''')
-          
-          {
-            node(POD_LABEL) {
-              
-              //Run your build here
-              sh "echo Hello World"
-              sh "sleep 10"
-              sh "hostname"
+          podTemplate(inheritFrom: 'container_slave')
+
+            {
+              node(POD_LABEL) {
+
+                //Run your build here
+                sh "echo Hello World"
+                sh "sleep 10"
+                sh "hostname"
+              }
             }
           }
         }
-      }
 
-      // In this stage you can run you build or the jobs
-      stage('sample') {
+        // In this stage you can run you build or the jobs
+        stage('Running on VM Node') {
+
+          when {
+            beforeAgent true
+            expression {
+              (env.jobNode != "container")
+            }
+          }
           
-        when {
-          expression {
-            not(env.jobNode == "container")
+         agent {
+            node "${jobNode}"
+          }
+          
+          steps {
+            echo "Running Job on ${jobNode}"
+            sh "hostname"
+            //Run your build here
+            sh 'sleep 10'
           }
         }
-          
-        agent {
-          node "${jobNode}"
-        }
-        
-        steps {
-          echo "Running Job on ${jobNode}"
-          sh "hostname"
-          //Run your build here
-          sh 'sleep 10'
-        }
-      }
 
+      }
     }
-  }
